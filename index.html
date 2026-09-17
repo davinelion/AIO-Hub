@@ -33,16 +33,12 @@
         <nav class="primary-nav" aria-label="Primary navigation">
           <p class="nav-label">Workspace</p>
           <a class="nav-item active" href="#overview" data-route="overview"><span class="icon icon-grid"></span>Overview</a>
-          <a class="nav-item" href="#explore" data-route="explore"><span class="icon icon-compass"></span>Explore all <span class="nav-count">1,248</span></a>
+          <a class="nav-item" href="#explore" data-route="explore"><span class="icon icon-compass"></span>Explore wiki <span class="nav-count" id="nav-wiki-count">…</span></a>
           <a class="nav-item" href="#library" data-route="library"><span class="icon icon-bookmark"></span>My library <span class="nav-count saved-count">0</span></a>
-          <a class="nav-item" href="#collections" data-route="collections"><span class="icon icon-folder"></span>Collections <span class="nav-count">12</span></a>
+          <a class="nav-item" href="#collections" data-route="collections"><span class="icon icon-folder"></span>Community picks <span class="nav-count">5</span></a>
 
-          <p class="nav-label categories-label">Browse by category</p>
-          <a class="nav-item category-link" href="#category/developer" data-category="developer"><span class="category-dot dot-blue"></span>Developer tools <span class="nav-count">186</span></a>
-          <a class="nav-item category-link" href="#category/ai" data-category="ai"><span class="category-dot dot-violet"></span>AI &amp; automation <span class="nav-count">142</span></a>
-          <a class="nav-item category-link" href="#category/design" data-category="design"><span class="category-dot dot-pink"></span>Design &amp; create <span class="nav-count">208</span></a>
-          <a class="nav-item category-link" href="#category/privacy" data-category="privacy"><span class="category-dot dot-green"></span>Privacy &amp; security <span class="nav-count">96</span></a>
-          <a class="nav-item category-link" href="#category/media" data-category="media"><span class="category-dot dot-orange"></span>Media &amp; play <span class="nav-count">314</span></a>
+          <p class="nav-label categories-label">Wiki pages</p>
+          <div id="wiki-nav" class="wiki-nav"></div>
         </nav>
 
         <div class="sidebar-spacer"></div>
@@ -70,13 +66,15 @@
         </header>
 
         <div class="page-content">
+         <div id="home-view">
           <section class="hero-section" id="overview">
             <div class="hero-copy">
               <div class="eyebrow"><span class="eyebrow-dot"></span> Curated open-web resources <span class="eyebrow-line"></span> <span class="eyebrow-update">Updated today</span></div>
-              <h1>Find your next<br /><em>favorite tool.</em></h1>
-              <p>One calm, searchable home for the internet's best apps, projects, and resources — without the noise.</p>
+              <h1>The whole open web,<br /><em>in one calm index.</em></h1>
+              <p>Every page of the FMHY wiki — streaming, AI, gaming, reading, privacy, tools and more — rebuilt as a fast, searchable directory you can browse, filter and save from.</p>
               <div class="hero-actions">
-                <button class="primary-button" data-focus-search><span class="icon icon-search"></span>Start exploring</button>
+                <button class="primary-button" data-focus-search><span class="icon icon-search"></span>Search everything</button>
+                <a class="text-button" href="#wiki/beginners-guide">Beginners guide <span class="icon icon-arrow-right"></span></a>
                 <a class="text-button" href="#about">How AIO Hub works <span class="icon icon-arrow-up-right"></span></a>
               </div>
             </div>
@@ -90,28 +88,34 @@
           </section>
 
           <section class="search-panel" aria-label="Search resources">
-            <div class="search-main"><span class="icon icon-search"></span><input id="global-search" type="search" autocomplete="off" placeholder="Search apps, projects, categories…" /><span class="search-shortcut">⌘ K</span></div>
-            <div class="search-suggestions"><span>Try:</span><button data-search="self-hosted">self-hosted</button><button data-search="design">design</button><button data-search="privacy">privacy</button><button data-search="developer">developer</button></div>
+            <div class="search-main"><span class="icon icon-search"></span><input id="global-search" type="search" autocomplete="off" placeholder="Search 16,000+ links: movies, anime, AI, torrents, ebooks, tools…" /><span class="search-shortcut">⌘ K</span></div>
+            <div class="search-suggestions"><span>Try:</span><button data-search="anime">anime</button><button data-search="ublock">ublock</button><button data-search="audiobooks">audiobooks</button><button data-search="emulator">emulator</button><button data-search="vpn">vpn</button></div>
+            <div class="wiki-search-results" id="wiki-search-results" hidden></div>
           </section>
 
           <section class="stats-row" aria-label="Index statistics">
-            <div class="stat-item"><span class="stat-icon blue"><span class="icon icon-layers"></span></span><div><strong>1,248</strong><span>curated resources</span></div></div>
-            <div class="stat-item"><span class="stat-icon violet"><span class="icon icon-sparkles"></span></span><div><strong>12</strong><span>living collections</span></div></div>
-            <div class="stat-item"><span class="stat-icon green"><span class="icon icon-check-circle"></span></span><div><strong>98.4%</strong><span>links checked this week</span></div></div>
-            <div class="index-update"><span class="live-dot"></span><span>Next link check in <b>3h 42m</b></span></div>
+            <div class="stat-item"><span class="stat-icon blue"><span class="icon icon-layers"></span></span><div><strong id="stat-total-links">…</strong><span>curated links</span></div></div>
+            <div class="stat-item"><span class="stat-icon violet"><span class="icon icon-sparkles"></span></span><div><strong id="stat-total-pages">…</strong><span>wiki pages</span></div></div>
+            <div class="stat-item"><span class="stat-icon green"><span class="icon icon-check-circle"></span></span><div><strong id="stat-total-sections">…</strong><span>sections</span></div></div>
+            <div class="index-update"><span class="live-dot"></span><span>Wiki data built <b id="wiki-generated">recently</b></span></div>
+          </section>
+
+          <section class="content-section wiki-home-section" id="explore">
+            <div class="section-heading"><div><span class="section-kicker">Browse the wiki</span><h2>Every page, every link</h2></div><a class="ghost-button" href="#wiki/beginners-guide">Start with the guide <span class="icon icon-arrow-right"></span></a></div>
+            <div class="category-grid wiki-home-grid" id="wiki-home-grid"><div class="wiki-loading"><span class="live-dot"></span> Loading wiki index…</div></div>
           </section>
 
           <div class="content-grid">
             <div class="primary-column">
-              <section class="content-section" id="explore">
-                <div class="section-heading"><div><span class="section-kicker">AIO picks</span><h2 id="resource-heading">Recommended for you</h2></div><div class="section-controls"><div class="view-toggle"><button class="view-button active" data-view="grid" aria-label="Grid view"><span class="icon icon-grid"></span></button><button class="view-button" data-view="list" aria-label="List view"><span class="icon icon-list"></span></button></div><button class="ghost-button" id="see-all">View all <span class="icon icon-arrow-right"></span></button></div></div>
+              <section class="content-section" id="community">
+                <div class="section-heading"><div><span class="section-kicker">Community picks</span><h2 id="resource-heading">Recommended for you</h2></div><div class="section-controls"><div class="view-toggle"><button class="view-button active" data-view="grid" aria-label="Grid view"><span class="icon icon-grid"></span></button><button class="view-button" data-view="list" aria-label="List view"><span class="icon icon-list"></span></button></div><button class="ghost-button" id="see-all">View all <span class="icon icon-arrow-right"></span></button></div></div>
                 <div class="filter-tabs" role="tablist"><button class="filter-tab active" data-tab="trending">Trending <span>↗</span></button><button class="filter-tab" data-tab="recent">Recently added</button><button class="filter-tab" data-tab="saved">Saved by you</button></div>
                 <div class="resource-grid" id="resource-grid"></div>
                 <div class="empty-state" id="empty-state" hidden><div class="empty-icon"><span class="icon icon-search"></span></div><h3>No resources found</h3><p>Try another search, or add a resource from one of your source clients.</p><button class="primary-button" id="empty-sync"><span class="icon icon-plus"></span>Add a source</button></div>
               </section>
 
               <section class="content-section categories-section" id="collections">
-                <div class="section-heading"><div><span class="section-kicker">Take a path</span><h2>Browse the index</h2></div><button class="ghost-button" id="all-categories">All categories <span class="icon icon-arrow-right"></span></button></div>
+                <div class="section-heading"><div><span class="section-kicker">Take a path</span><h2>Community collections</h2></div><button class="ghost-button" id="all-categories">All picks <span class="icon icon-arrow-right"></span></button></div>
                 <div class="category-grid">
                   <button class="category-card category-blue" data-category="developer"><span class="category-symbol">⌘</span><span><b>Developer tools</b><small>Build, ship &amp; automate</small></span><span class="icon icon-arrow-up-right"></span></button>
                   <button class="category-card category-violet" data-category="ai"><span class="category-symbol">✦</span><span><b>AI &amp; automation</b><small>Work smarter, not louder</small></span><span class="icon icon-arrow-up-right"></span></button>
@@ -143,8 +147,31 @@
               <section class="quote-card"><span class="quote-mark">“</span><p>A good tool should disappear into the way you work.</p><div class="quote-author"><span class="author-avatar">A</span><span><b>AIO community</b><small>Built in public</small></span></div></section>
             </aside>
           </div>
+         </div>
+
+         <div id="wiki-view" class="wiki-view" hidden>
+          <div class="wiki-layout">
+            <article class="wiki-main">
+              <header class="wiki-header">
+                <span class="section-kicker" id="wiki-kicker"></span>
+                <h1 id="wiki-title"></h1>
+                <p id="wiki-blurb"></p>
+                <div class="wiki-toolbar">
+                  <div class="wiki-filter-wrap"><span class="icon icon-search"></span><input id="wiki-filter" type="search" autocomplete="off" placeholder="Filter this page…  ( / )" /><span class="wiki-filter-status" id="wiki-filter-status"></span></div>
+                  <button class="ghost-button wiki-toggle" id="wiki-starred" title="Only show starred picks">⭐ Starred only</button>
+                  <a class="ghost-button" id="wiki-original" href="#" target="_blank" rel="noopener noreferrer">View on fmhy.net <span class="icon icon-arrow-up-right"></span></a>
+                  <a class="ghost-button" id="wiki-source" href="#" target="_blank" rel="noopener noreferrer">Source .md <span class="icon icon-arrow-up-right"></span></a>
+                </div>
+              </header>
+              <div id="wiki-body" class="wiki-body"></div>
+            </article>
+            <aside class="wiki-aside">
+              <div class="toc-card"><div class="toc-heading"><b>On this page</b><button class="mini-action" id="wiki-expand-toc" aria-label="Toggle table of contents"><span class="icon icon-chevron-down"></span></button></div><nav id="wiki-toc" class="wiki-toc"></nav></div>
+            </aside>
+          </div>
+         </div>
         </div>
-        <footer class="site-footer"><span>© 2026 AIO Hub</span><span class="footer-divider"></span><a href="#about">About the index</a><a href="#contribute">Contribute</a><a href="#privacy">Privacy</a><span class="footer-spacer"></span><span class="footer-domain"><span class="live-dot"></span> aio.tools</span></footer>
+        <footer class="site-footer"><span>© 2026 AIO Hub</span><span class="footer-divider"></span><a href="https://github.com/fmhy/edit" target="_blank" rel="noopener noreferrer">Data: FMHY wiki (CC0)</a><a href="https://fmhy.net" target="_blank" rel="noopener noreferrer">fmhy.net</a><a href="#wiki/unsafe">Unsafe sites</a><span class="footer-spacer"></span><span class="footer-domain"><span class="live-dot"></span> aio.tools</span></footer>
       </main>
     </div>
 
@@ -162,5 +189,6 @@
     <section class="modal article-modal" id="article-modal" role="dialog" aria-modal="true" aria-labelledby="article-title" hidden><div class="modal-header"><div><span class="section-kicker">Automated editorial</span><h2 id="article-title">The AIO monthly</h2><p id="article-meta">Generated from your latest source sync.</p></div><button class="icon-button modal-close" data-close-modal aria-label="Close article"><span class="icon icon-x"></span></button></div><article class="article-preview" id="article-preview"></article><div class="modal-footer article-footer"><span><span class="icon icon-sparkles"></span> Draft is built from ranked, categorized source data</span><div><button class="ghost-button" id="copy-article">Copy markdown</button><button class="primary-button" id="download-article"><span class="icon icon-download"></span> Download .md</button></div></div></section>
     <div class="toast" id="toast" role="status"><span class="toast-icon"><span class="icon icon-check"></span></span><span id="toast-message">Done</span></div>
     <script src="app.js"></script>
+    <script src="wiki.js"></script>
   </body>
 </html>

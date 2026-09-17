@@ -50,6 +50,9 @@ const state = {
 };
 let toastTimer;
 let quickHighlight = 0;
+let searchTimer;
+window.AIOSaved = new Set(state.saved);
+state.wikiSaved = readStorage('aio-wiki-saved', {});
 
 function readStorage(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
@@ -69,8 +72,9 @@ function resourceMatches(resource, query) {
   const haystack = [resource.name, resource.type, resource.description, resource.category, formatCategory(resource.category), ...(resource.tags || []), resource.source].join(' ').toLowerCase();
   return haystack.includes(query.toLowerCase());
 }
+function allResources() { return [...state.resources, ...Object.values(state.wikiSaved || {})]; }
 function currentResources() {
-  let list = [...state.resources];
+  let list = allResources();
   if (state.category) list = list.filter(resource => resource.category === state.category);
   list = list.filter(resource => resourceMatches(resource, state.query));
   if (state.tab === 'saved') list = list.filter(resource => state.saved.includes(resource.id));
@@ -112,7 +116,7 @@ function resourceCard(resource) {
 }
 function renderLibrary() {
   const library = document.getElementById('library-list');
-  const savedResources = state.resources.filter(resource => state.saved.includes(resource.id));
+  const savedResources = allResources().filter(resource => state.saved.includes(resource.id));
   if (!savedResources.length) {
     library.innerHTML = `<div class="library-empty">${iconMarkup('icon-bookmark')}<p>Your personal shortlist<br /><small>will show up here.</small></p></div>`;
   } else {
@@ -168,11 +172,31 @@ function updateCounts() {
   renderSourceHealth();
   renderIntegrations();
 }
-function renderQuickResults(query = '') {
-  const results = state.resources.filter(resource => resourceMatches(resource, query)).slice(0, 7);
+function runWikiSearch(query) {
+  const target = document.getElementById('wiki-search-results');
+  if (!target || !window.AIOWiki) return;
+  target.dataset.query = query;
+  if (!query) { target.hidden = true; target.innerHTML = ''; return; }
+  window.AIOWiki.renderSearchResults(query, target, 30).catch(() => { target.innerHTML = '<div class="quick-empty">Search index unavailable.</div>'; });
+}
+async function renderQuickResults(query = '') {
   const target = document.getElementById('quick-results');
   quickHighlight = 0;
-  target.innerHTML = results.length ? results.map((resource, index) => `<button class="quick-result${index === 0 ? ' highlighted' : ''}" data-open-resource="${escapeHTML(resource.id)}"><span class="resource-icon ${escapeHTML(resource.tone || 'blue')}">${escapeHTML(resource.icon || '•')}</span><span><b>${escapeHTML(resource.name)}</b><small>${escapeHTML(resource.type || formatCategory(resource.category))}</small></span>${iconMarkup('icon-arrow-up-right')}</button>`).join('') : '<div class="quick-empty">No matching resources yet.<br />Try a different search term.</div>';
+  if (!query) {
+    const pages = window.AIOWiki?.index?.pages || [];
+    target.innerHTML = pages.length ? `<div class="quick-section-label">Wiki pages</div>${pages.map((page, index) => `<a class="quick-result${index === 0 ? ' highlighted' : ''}" href="#wiki/${page.slug}" data-quick-link><span class="resource-icon ${page.tone}">${escapeHTML(page.symbol)}</span><span><b>${escapeHTML(page.title)}</b><small>${page.entries.toLocaleString('en-US')} links</small></span>${iconMarkup('icon-arrow-right')}</a>`).join('')}` : '<div class="quick-empty">Type to search the wiki.</div>';
+    return;
+  }
+  const local = allResources().filter(resource => resourceMatches(resource, query)).slice(0, 3);
+  target.innerHTML = '<div class="quick-empty"><span class="live-dot"></span> Searching…</div>';
+  let rows = [];
+  try { rows = await window.AIOWiki.searchEntries(query, 12); } catch { /* ignore */ }
+  if (document.getElementById('quick-search-input').value.trim() !== query) return;
+  const localMarkup = local.map(resource => `<button class="quick-result" data-open-resource="${escapeHTML(resource.id)}"><span class="resource-icon ${escapeHTML(resource.tone || 'blue')}">${escapeHTML(resource.icon || '•')}</span><span><b>${escapeHTML(resource.name)}</b><small>${escapeHTML(resource.type || formatCategory(resource.category))}</small></span>${iconMarkup('icon-arrow-up-right')}</button>`).join('');
+  const wikiMarkup = rows.map(row => window.AIOWiki.resultMarkup(row, 'quick-result')).join('');
+  target.innerHTML = (rows.length || local.length) ? `${rows.length ? `<div class="quick-section-label">Wiki</div>${wikiMarkup}` : ''}${local.length ? `<div class="quick-section-label">Community picks</div>${localMarkup}` : ''}` : '<div class="quick-empty">No matching resources yet.<br />Try a different search term.</div>';
+  const items = [...target.querySelectorAll('.quick-result')];
+  updateQuickHighlight(items);
 }
 function setTheme(theme) {
   state.theme = theme;
@@ -206,14 +230,15 @@ function closeModals() {
 function openSyncModal() { openModal('sync-modal'); updateCounts(); }
 function setActiveNav(route) {
   document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.route === route));
-  document.getElementById('breadcrumb-current').textContent = route === 'library' ? 'My library' : route === 'collections' ? 'Collections' : route === 'explore' ? 'Explore all' : 'Overview';
+  document.getElementById('breadcrumb-current').textContent = route === 'library' ? 'My library' : route === 'collections' ? 'Community picks' : route === 'explore' ? 'Explore wiki' : 'Overview';
 }
 function applyHash() {
   const hash = window.location.hash.replace('#', '');
+  if (hash.startsWith('wiki/')) return;
   if (hash.startsWith('category/')) {
-    state.category = hash.split('/')[1]; state.tab = 'trending'; state.query = ''; setActiveNav('explore'); renderResources(); document.getElementById('explore').scrollIntoView({ behavior: 'smooth', block: 'start' }); return;
+    state.category = hash.split('/')[1]; state.tab = 'trending'; state.query = ''; setActiveNav('collections'); renderResources(); document.getElementById('community').scrollIntoView({ behavior: 'smooth', block: 'start' }); return;
   }
-  if (hash === 'library') { state.category = null; state.tab = 'saved'; state.query = ''; setActiveNav('library'); renderResources(); document.getElementById('explore').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  if (hash === 'library') { state.category = null; state.tab = 'saved'; state.query = ''; setActiveNav('library'); renderResources(); document.getElementById('community').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (hash === 'collections') { state.category = null; setActiveNav('collections'); document.getElementById('collections').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (hash === 'explore') { state.category = null; state.tab = 'trending'; setActiveNav('explore'); renderResources(); document.getElementById('explore').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   state.category = null;
@@ -224,11 +249,22 @@ function applyHash() {
   renderResources();
   setActiveNav('overview');
 }
-function chooseCategory(category) { state.category = category; state.tab = 'trending'; state.query = ''; document.getElementById('global-search').value = ''; window.location.hash = `category/${category}`; renderResources(); document.getElementById('explore').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+function chooseCategory(category) { state.category = category; state.tab = 'trending'; state.query = ''; document.getElementById('global-search').value = ''; window.location.hash = `category/${category}`; renderResources(); document.getElementById('community').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 function toggleSaved(id) {
   if (state.saved.includes(id)) { state.saved = state.saved.filter(savedId => savedId !== id); showToast('Removed from your library'); }
   else { state.saved.push(id); showToast('Saved to your library'); }
+  if (id.startsWith('wiki:') && !state.saved.includes(id)) { delete state.wikiSaved[id]; saveStorage('aio-wiki-saved', state.wikiSaved); }
+  window.AIOSaved = new Set(state.saved);
   saveStorage('aio-saved', state.saved); renderResources();
+  document.dispatchEvent(new CustomEvent('aio:saved-changed'));
+}
+function toggleWikiSaved({ url, title, description, page }) {
+  const id = `wiki:${url}`;
+  if (!state.saved.includes(id)) {
+    state.wikiSaved[id] = { id, name: title, description, url, category: page, type: window.AIOWiki?.index?.pages.find(p => p.slug === page)?.title || 'Wiki', tone: window.AIOWiki?.index?.pages.find(p => p.slug === page)?.tone || 'blue', icon: (title || '•').slice(0, 1).toUpperCase(), source: 'wiki', addedAt: new Date().toISOString(), tags: ['wiki', page].filter(Boolean) };
+    saveStorage('aio-wiki-saved', state.wikiSaved);
+  }
+  toggleSaved(id);
 }
 function persistSourceState() {
   saveStorage('aio-source-state', state.sourceState);
@@ -449,7 +485,7 @@ function connectSource(source) {
   syncSource(source).then(count => showToast(count ? `${count} new ${info.name} picks added` : `${info.name} is already up to date`)).catch(error => showToast(error.message, 'error'));
 }
 function openResource(id) {
-  const resource = state.resources.find(item => item.id === id); if (resource?.url) window.open(resource.url, '_blank', 'noopener,noreferrer');
+  const resource = allResources().find(item => item.id === id); if (resource?.url) window.open(resource.url, '_blank', 'noopener,noreferrer');
 }
 function bindEvents() {
   document.addEventListener('click', event => {
@@ -458,7 +494,7 @@ function bindEvents() {
     const categoryButton = event.target.closest('[data-category]'); if (categoryButton) { chooseCategory(categoryButton.dataset.category); return; }
     const tabButton = event.target.closest('[data-tab]'); if (tabButton) { state.tab = tabButton.dataset.tab; state.category = null; document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.toggle('active', tab === tabButton)); renderResources(); return; }
     const viewButton = event.target.closest('[data-view]'); if (viewButton) { state.view = viewButton.dataset.view; document.querySelectorAll('.view-button').forEach(button => button.classList.toggle('active', button === viewButton)); renderResources(); return; }
-    const searchSuggestion = event.target.closest('[data-search]'); if (searchSuggestion) { state.query = searchSuggestion.dataset.search; document.getElementById('global-search').value = state.query; state.category = null; renderResources(); document.getElementById('explore').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    const searchSuggestion = event.target.closest('[data-search]'); if (searchSuggestion) { state.query = searchSuggestion.dataset.search; document.getElementById('global-search').value = state.query; state.category = null; renderResources(); runWikiSearch(state.query); return; }
     if (event.target.closest('#sync-all')) { syncAllSources(); return; }
     if (event.target.closest('#generate-article')) { generateMonthlyArticle(); return; }
     if (event.target.closest('#download-article')) { downloadArticle(); return; }
@@ -466,20 +502,24 @@ function bindEvents() {
     if (event.target.closest('#sync-button, #sidebar-sync, #manage-sources, #empty-sync')) { openSyncModal(); return; }
     const connectButton = event.target.closest('[data-connect]'); if (connectButton) { connectSource(connectButton.dataset.connect); return; }
     const quickResource = event.target.closest('[data-open-resource]'); if (quickResource) { openResource(quickResource.dataset.openResource); closeModals(); return; }
+    if (event.target.closest('[data-quick-link], #quick-results [data-wiki-result]')) { closeModals(); return; }
     if (event.target.closest('[data-close-modal]') || event.target.id === 'modal-backdrop') { closeModals(); return; }
     if (event.target.closest('#theme-toggle, #top-theme-toggle')) { toggleTheme(); return; }
     if (event.target.closest('#mobile-menu')) { document.getElementById('sidebar').classList.add('open'); document.querySelector('.mobile-backdrop').classList.add('open'); return; }
     if (event.target.closest('[data-close-sidebar]')) { document.getElementById('sidebar').classList.remove('open'); document.querySelector('.mobile-backdrop').classList.remove('open'); return; }
     if (event.target.closest('#keyboard-help')) { openModal('search-modal'); return; }
     if (event.target.closest('[data-focus-search]')) { document.getElementById('global-search').focus(); return; }
-    if (event.target.closest('#see-all, #all-categories')) { state.query = ''; state.category = null; state.tab = 'trending'; document.getElementById('global-search').value = ''; renderResources(); document.getElementById('explore').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
-    if (event.target.closest('#open-library')) { state.tab = 'saved'; state.category = null; renderResources(); document.getElementById('explore').scrollIntoView({ behavior: 'smooth', block: 'start' }); setActiveNav('library'); return; }
+    if (event.target.closest('#see-all, #all-categories')) { state.query = ''; state.category = null; state.tab = 'trending'; document.getElementById('global-search').value = ''; renderResources(); document.getElementById('community').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    if (event.target.closest('#open-library')) { state.tab = 'saved'; state.category = null; renderResources(); document.getElementById('community').scrollIntoView({ behavior: 'smooth', block: 'start' }); setActiveNav('library'); return; }
     if (event.target.closest('#library-menu, #source-options')) { showToast('More workspace controls are coming soon'); return; }
     if (event.target.closest('#download-template')) { downloadTemplate(); return; }
     if (event.target.closest('.nav-item[data-route]')) { document.getElementById('sidebar').classList.remove('open'); document.querySelector('.mobile-backdrop').classList.remove('open'); }
   });
-  document.getElementById('global-search').addEventListener('input', event => { state.query = event.target.value.trim(); state.category = null; renderResources(); });
-  document.getElementById('quick-search-input').addEventListener('input', event => renderQuickResults(event.target.value.trim()));
+  document.getElementById('global-search').addEventListener('input', event => { state.query = event.target.value.trim(); state.category = null; renderResources(); clearTimeout(searchTimer); searchTimer = setTimeout(() => runWikiSearch(state.query), 120); });
+  document.getElementById('global-search').addEventListener('focus', () => { if (window.AIOWiki) window.AIOWiki.loadSearch().catch(() => {}); });
+  document.addEventListener('aio:toggle-wiki-save', event => toggleWikiSaved(event.detail));
+  document.addEventListener('aio:close-modals', closeModals);
+  document.getElementById('quick-search-input').addEventListener('input', event => { clearTimeout(searchTimer); searchTimer = setTimeout(() => renderQuickResults(event.target.value.trim()), 100); });
   document.getElementById('import-form').addEventListener('submit', importProjectForm);
   document.getElementById('data-file').addEventListener('change', importFile);
   window.addEventListener('hashchange', applyHash);
@@ -490,7 +530,7 @@ function bindEvents() {
     const items = [...document.querySelectorAll('.quick-result')];
     if (event.key === 'ArrowDown' && items.length) { event.preventDefault(); quickHighlight = (quickHighlight + 1) % items.length; updateQuickHighlight(items); }
     if (event.key === 'ArrowUp' && items.length) { event.preventDefault(); quickHighlight = (quickHighlight - 1 + items.length) % items.length; updateQuickHighlight(items); }
-    if (event.key === 'Enter' && items[quickHighlight]) { event.preventDefault(); openResource(items[quickHighlight].dataset.openResource); closeModals(); }
+    if (event.key === 'Enter' && items[quickHighlight]) { event.preventDefault(); const item = items[quickHighlight]; if (item.dataset.openResource) openResource(item.dataset.openResource); else if (item.getAttribute('href')?.startsWith('#')) window.location.hash = item.getAttribute('href').slice(1); else if (item.href) window.open(item.href, '_blank', 'noopener,noreferrer'); closeModals(); }
   });
 }
 function updateQuickHighlight(items) { items.forEach((item, index) => item.classList.toggle('highlighted', index === quickHighlight)); items[quickHighlight]?.scrollIntoView({ block: 'nearest' }); }
