@@ -1,0 +1,10 @@
+{
+  "name": "AIO Hub",
+  "short_name": "AIO Hub",
+  "description": "A calm, searchable home for the open web's best tools and projects.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#09111f",
+  "icons": []
+}
