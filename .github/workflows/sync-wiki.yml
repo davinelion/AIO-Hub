@@ -1,0 +1,29 @@
+name: Sync wiki data from FMHY
+
+on:
+  schedule:
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out AIO Hub
+        uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build wiki dataset from fmhy/edit
+        run: node scripts/build-wiki.mjs
+      - name: Commit updated wiki data
+        run: |
+          git config user.name 'AIO Hub automation'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add content/wiki
+          git diff --cached --quiet || git commit -m "chore: sync wiki data from FMHY"
+          git push

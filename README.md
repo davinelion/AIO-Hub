@@ -1,8 +1,31 @@
 # AIO Hub
 
-A calm, fast directory for discovering the open web's best apps, projects, and resources. This is a from-scratch reinterpretation of the resource-directory experience behind FMHY — with an original visual system, local-first library, quick search, and source import workflows.
+A calm, fast directory for the open web. AIO Hub ships the **complete FMHY wiki** (16,000+ curated links across 25 pages — streaming, AI, gaming, reading, privacy, mobile, tools and more) inside an original dashboard UI with instant search, per-page filtering, a table of contents, and a local-first library.
 
-## Included
+The wiki content comes from the open-source [fmhy/edit](https://github.com/fmhy/edit) repository (the markdown behind [fmhy.net](https://fmhy.net)) and is parsed into JSON by `scripts/build-wiki.mjs`. AIO Hub is an independent front-end; it is not affiliated with FMHY.
+
+## Wiki
+
+- **All 25 FMHY pages**: Beginners Guide, Adblocking / Privacy, AI, Movies / TV / Anime, Music / Podcasts / Radio, Gaming / Emulation, Books / Comics / Manga, Downloading, Torrenting, Educational, Android / iOS, Linux / macOS, Non-English, Miscellaneous, System / File / Internet / Social Media / Text / Video / Image / Gaming / Developer Tools, Storage, Unsafe Sites.
+- Sections, sub-sections, notes, warnings, ⭐ / 🌟 star markers and multi-mirror links are preserved. Internal FMHY cross-links (including legacy Reddit wiki links) are rewritten to in-app routes.
+- Global search over every entry (`⌘K` or the search box), with results linking to the exact section.
+- Per-page filter (`/`), "starred only" toggle, sticky table of contents with scroll-spy, and a one-click bookmark on every entry that lands in **My library**.
+- Deep-linkable routes: `#wiki/<page>` and `#wiki/<page>/<section>`.
+
+### Refreshing the wiki data
+
+```bash
+node scripts/build-wiki.mjs                # clones fmhy/edit and rebuilds content/wiki
+node scripts/build-wiki.mjs path/to/edit/docs   # or point at a local checkout
+```
+
+`.github/workflows/sync-wiki.yml` runs this daily and commits the result, so the index stays current with upstream.
+
+## Disclaimer
+
+AIO Hub indexes third-party links curated by the FMHY community. Nothing is hosted here; availability, legality and safety of linked sites vary by country and change over time. The dataset is committed to the repository on purpose so the site stays a zero-build static deploy — run the sync script or workflow to refresh it.
+
+## Also included
 
 - Responsive dashboard layout with dark/light mode.
 - Fast client-side search across names, descriptions, categories, types, and tags.
