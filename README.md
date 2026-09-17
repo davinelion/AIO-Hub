@@ -21,6 +21,10 @@ node scripts/build-wiki.mjs path/to/edit/docs   # or point at a local checkout
 
 `.github/workflows/sync-wiki.yml` runs this daily and commits the result, so the index stays current with upstream.
 
+## Disclaimer
+
+AIO Hub indexes third-party links curated by the FMHY community. Nothing is hosted here; availability, legality and safety of linked sites vary by country and change over time. The dataset is committed to the repository on purpose so the site stays a zero-build static deploy — run the sync script or workflow to refresh it.
+
 ## Also included
 
 - Responsive dashboard layout with dark/light mode.

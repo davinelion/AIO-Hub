@@ -258,3 +258,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .wiki-save { opacity: 1; }
 }
 @media (max-width: 600px) { .wiki-home-grid { grid-template-columns: 1fr; } .wiki-header h1 { font-size: 30px; } .wiki-h2 { font-size: 20px; } .wiki-nav { max-height: none; } }
+
+.footer-note { color: var(--text-faint); font-size: 9px; margin-left: 6px; }
+@media (max-width: 860px) { .footer-note { flex-basis: 100%; margin-left: 0; } }
