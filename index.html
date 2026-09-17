@@ -130,8 +130,15 @@
               </section>
               <section class="side-card sources-card">
                 <div class="side-card-heading"><div><span class="section-kicker">Automated index</span><h3>Source health</h3></div><button class="icon-button subtle" id="source-options" aria-label="Source options"><span class="icon icon-more"></span></button></div>
-                <div class="source-list"><div class="source-row"><span class="source-logo github-logo">●</span><div><b>GitHub</b><small id="github-source-copy">Public repos · ready to connect</small></div><span class="source-status" id="github-status">●</span></div><div class="source-row"><span class="source-logo gitlab-logo">◆</span><div><b>GitLab</b><small id="gitlab-source-copy">Projects · ready to connect</small></div><span class="source-status" id="gitlab-status">●</span></div><div class="source-row"><span class="source-logo feed-logo"><span class="icon icon-rss"></span></span><div><b>Community feed</b><small>Last checked 14 min ago</small></div><span class="source-status online">●</span></div></div>
+                <div class="source-list" id="source-health-list"></div>
                 <button class="full-width-button secondary" id="manage-sources"><span class="icon icon-plus"></span> Manage sources</button>
+              </section>
+              <section class="side-card automation-card">
+                <div class="side-card-heading"><div><span class="section-kicker">On autopilot</span><h3>Monthly digest</h3></div><span class="automation-pulse"><span class="live-dot"></span></span></div>
+                <p class="automation-copy">Collect, rank, categorize, and turn the best new apps into a ready-to-publish article.</p>
+                <div class="automation-stats"><div><b id="collected-count">12</b><small>collected this month</small></div><div><b id="article-count">1</b><small>article generated</small></div></div>
+                <div class="automation-actions"><button class="full-width-button secondary" id="sync-all"><span class="icon icon-refresh"></span> Sync all sources</button><button class="full-width-button" id="generate-article"><span class="icon icon-sparkles"></span> Generate monthly article <span class="icon icon-arrow-right"></span></button></div>
+                <small class="automation-last" id="automation-last">Next scheduled run · 1st of every month</small>
               </section>
               <section class="quote-card"><span class="quote-mark">“</span><p>A good tool should disappear into the way you work.</p><div class="quote-author"><span class="author-avatar">A</span><span><b>AIO community</b><small>Built in public</small></span></div></section>
             </aside>
@@ -144,11 +151,7 @@
     <div class="modal-backdrop" id="modal-backdrop" hidden></div>
     <section class="modal" id="sync-modal" role="dialog" aria-modal="true" aria-labelledby="sync-title" hidden>
       <div class="modal-header"><div><span class="section-kicker">Keep it fresh</span><h2 id="sync-title">Connect your sources</h2><p>Pull public projects into your AIO index. Nothing is posted or changed on your accounts.</p></div><button class="icon-button modal-close" data-close-modal aria-label="Close dialog"><span class="icon icon-x"></span></button></div>
-      <div class="integration-list">
-        <div class="integration-card"><span class="integration-icon github-logo large-logo">●</span><div class="integration-copy"><b>GitHub</b><span>Import public repositories as tools</span></div><button class="integration-action" data-connect="github" id="github-connect">Connect</button></div>
-        <div class="integration-card"><span class="integration-icon gitlab-logo large-logo">◆</span><div class="integration-copy"><b>GitLab</b><span>Import public projects and snippets</span></div><button class="integration-action" data-connect="gitlab" id="gitlab-connect">Connect</button></div>
-        <div class="integration-card"><span class="integration-icon feed-logo large-logo"><span class="icon icon-link"></span></span><div class="integration-copy"><b>Public feed URL</b><span>Sync a JSON or RSS resource feed</span></div><button class="integration-action" data-connect="feed">Add feed</button></div>
-      </div>
+      <div class="integration-list" id="integration-list"></div>
       <div class="modal-divider"><span>or add a single project</span></div>
       <form class="import-form" id="import-form"><label for="project-url">GitHub / GitLab project URL</label><div class="input-with-button"><span class="icon icon-link"></span><input id="project-url" placeholder="github.com/owner/repository" autocomplete="off" /><button type="submit">Import</button></div><small>Public repositories are fetched automatically and added to your local index.</small></form>
       <div class="file-import"><label class="file-drop" for="data-file"><span class="icon icon-upload"></span><span><b>Import JSON or CSV</b><small>Bring your existing catalog with you</small></span><input id="data-file" type="file" accept=".json,.csv,application/json,text/csv" /></label><button class="text-button" id="download-template">Download template <span class="icon icon-download"></span></button></div>
@@ -156,6 +159,7 @@
     </section>
 
     <section class="modal search-modal" id="search-modal" role="dialog" aria-modal="true" aria-labelledby="quick-search-title" hidden><div class="search-modal-top"><span class="icon icon-search"></span><input id="quick-search-input" placeholder="Search the index…" autocomplete="off" /><span class="kbd">ESC</span></div><div class="quick-results" id="quick-results"></div><div class="quick-footer"><span><span class="kbd">↑↓</span> Navigate</span><span><span class="kbd">↵</span> Open</span><span><span class="kbd">ESC</span> Close</span></div></section>
+    <section class="modal article-modal" id="article-modal" role="dialog" aria-modal="true" aria-labelledby="article-title" hidden><div class="modal-header"><div><span class="section-kicker">Automated editorial</span><h2 id="article-title">The AIO monthly</h2><p id="article-meta">Generated from your latest source sync.</p></div><button class="icon-button modal-close" data-close-modal aria-label="Close article"><span class="icon icon-x"></span></button></div><article class="article-preview" id="article-preview"></article><div class="modal-footer article-footer"><span><span class="icon icon-sparkles"></span> Draft is built from ranked, categorized source data</span><div><button class="ghost-button" id="copy-article">Copy markdown</button><button class="primary-button" id="download-article"><span class="icon icon-download"></span> Download .md</button></div></div></section>
     <div class="toast" id="toast" role="status"><span class="toast-icon"><span class="icon icon-check"></span></span><span id="toast-message">Done</span></div>
     <script src="app.js"></script>
   </body>

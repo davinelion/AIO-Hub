@@ -15,17 +15,33 @@ const seedResources = [
 
 const categoryNames = { developer: 'Developer tools', ai: 'AI & automation', design: 'Design & create', privacy: 'Privacy & security', media: 'Media & play' };
 const categoryKeywords = {
-  developer: ['developer', 'dev', 'code', 'api', 'cli', 'programming', 'software', 'library', 'framework', 'terminal'],
-  ai: ['ai', 'automation', 'workflow', 'machine', 'bot', 'agent', 'model'],
-  design: ['design', 'creative', 'note', 'writing', 'photo', 'video', 'prototype', 'art'],
-  privacy: ['privacy', 'security', 'password', 'network', 'encrypted', 'vpn', 'auth'],
-  media: ['media', 'music', 'movie', 'stream', 'photo', 'recipe', 'game', 'self-hosted']
+  developer: ['developer', 'dev', 'code', 'api', 'cli', 'programming', 'software', 'library', 'framework', 'terminal', 'database', 'testing'],
+  ai: ['ai', 'automation', 'workflow', 'machine', 'bot', 'agent', 'model', 'llm', 'prompt', 'inference'],
+  design: ['design', 'creative', 'note', 'writing', 'photo', 'video', 'prototype', 'art', 'font', 'figma'],
+  privacy: ['privacy', 'security', 'password', 'network', 'encrypted', 'vpn', 'auth', 'backup', 'identity'],
+  media: ['media', 'music', 'movie', 'stream', 'photo', 'recipe', 'game', 'self-hosted', 'podcast', 'home']
 };
+
+const sourceCatalog = [
+  { id: 'github', name: 'GitHub', description: 'Public repositories ranked by stars and activity', logo: '●', logoClass: 'source-github', coverage: 'open-source repos', api: 'github' },
+  { id: 'gitlab', name: 'GitLab', description: 'Public projects ranked by community interest', logo: '◆', logoClass: 'source-gitlab', coverage: 'public projects', api: 'gitlab' },
+  { id: 'npm', name: 'npm Registry', description: 'Popular JavaScript packages and developer apps', logo: 'npm', logoClass: 'source-npm', coverage: 'JS packages', api: 'npm' },
+  { id: 'pypi', name: 'PyPI', description: 'Popular Python packages with release activity', logo: 'Py', logoClass: 'source-pypi', coverage: 'Python packages', api: 'pypi' },
+  { id: 'docker', name: 'Docker Hub', description: 'Popular containerized tools ready to run', logo: '◇', logoClass: 'source-docker', coverage: 'container images', api: 'docker' },
+  { id: 'hackernews', name: 'Hacker News', description: 'New projects surfaced by the tech community', logo: 'Y', logoClass: 'source-hn', coverage: 'Show HN launches', api: 'hackernews' },
+  { id: 'producthunt', name: 'Product Hunt', description: 'New product launches and makers to watch', logo: 'P', logoClass: 'source-producthunt', coverage: 'new launches', api: 'manual' },
+  { id: 'feed', name: 'JSON / RSS feed', description: 'Bring in a team-maintained public catalog', logo: '↗', logoClass: 'source-feed', coverage: 'custom feed', api: 'feed' }
+];
+const defaultSourceState = Object.fromEntries(sourceCatalog.map(source => [source.id, { connected: false, status: 'ready', lastSync: null, count: 0 }]));
 
 const state = {
   resources: loadResources(),
   saved: readStorage('aio-saved', []),
   connected: readStorage('aio-connected', { github: false, gitlab: false, feed: false }),
+  sourceState: { ...defaultSourceState, ...readStorage('aio-source-state', {}) },
+  lastSync: readStorage('aio-last-sync', null),
+  articleCount: readStorage('aio-article-count', 0),
+  articleMarkdown: '',
   query: '',
   tab: 'trending',
   category: null,
@@ -105,16 +121,52 @@ function renderLibrary() {
   const progress = Math.min(100, savedResources.length * 12.5);
   document.getElementById('library-progress-fill').style.width = `${progress}%`;
 }
+function sourceInfo(id) { return sourceCatalog.find(source => source.id === id) || { id, name: id ? String(id).replace(/^./, value => value.toUpperCase()) : 'Community', description: 'Imported source', logo: '•', logoClass: 'source-feed', coverage: 'imported source', api: 'feed' }; }
+function sourceStatusCopy(source) {
+  const current = state.sourceState[source.id] || {};
+  if (current.status === 'syncing') return 'Syncing now…';
+  if (current.status === 'error') return 'Needs attention · try again';
+  if (current.lastSync) return `${current.count || 0} collected · ${relativeTime(current.lastSync)}`;
+  return `${source.coverage} · ready to sync`;
+}
+function relativeTime(value) {
+  const elapsed = Math.max(0, Date.now() - new Date(value).getTime());
+  const minutes = Math.floor(elapsed / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+function renderSourceHealth() {
+  const target = document.getElementById('source-health-list');
+  if (!target) return;
+  const visibleSources = sourceCatalog.filter(source => ['github', 'gitlab', 'npm', 'hackernews'].includes(source.id));
+  target.innerHTML = visibleSources.map(source => {
+    const current = state.sourceState[source.id] || {};
+    const statusClass = current.status === 'ready' && current.lastSync ? 'online' : current.status === 'syncing' ? 'syncing' : current.status === 'error' ? 'error' : '';
+    return `<div class="source-row"><span class="source-logo ${source.logoClass}">${source.logo === 'feed' ? iconMarkup('icon-rss') : escapeHTML(source.logo)}</span><div><b>${escapeHTML(source.name)}</b><small>${escapeHTML(sourceStatusCopy(source))}</small></div><span class="source-status ${statusClass}">●</span></div>`;
+  }).join('');
+}
+function renderIntegrations() {
+  const target = document.getElementById('integration-list');
+  if (!target) return;
+  target.innerHTML = sourceCatalog.map(source => {
+    const current = state.sourceState[source.id] || {};
+    const isManual = source.api === 'manual' || source.api === 'feed';
+    const connected = !!current.connected;
+    const action = source.api === 'feed' ? 'Add feed' : source.api === 'manual' ? 'Guide' : connected ? 'Connected' : 'Connect';
+    return `<div class="integration-card${connected ? ' is-connected' : ''}" data-integration="${source.id}"><span class="integration-icon source-logo ${source.logoClass} large-logo">${source.logo === 'feed' ? iconMarkup('icon-link') : escapeHTML(source.logo)}</span><div class="integration-copy"><b>${escapeHTML(source.name)}</b><span>${escapeHTML(source.description)}</span><div class="integration-meta">${connected ? '<span class="live-dot"></span> Ready for automatic collection' : isManual ? 'Optional · add a public feed or API key' : 'Public API · read-only access'}</div></div><button class="integration-action${connected ? ' connected' : ''}" data-connect="${source.id}">${action}</button></div>`;
+  }).join('');
+}
 function updateCounts() {
   document.querySelectorAll('.saved-count').forEach(element => { element.textContent = state.saved.length; });
-  const github = document.getElementById('github-status');
-  const gitlab = document.getElementById('gitlab-status');
-  const githubCopy = document.getElementById('github-source-copy');
-  const gitlabCopy = document.getElementById('gitlab-source-copy');
-  if (github) { github.classList.toggle('online', !!state.connected.github); githubCopy.textContent = state.connected.github ? 'Connected · public repositories' : 'Public repos · ready to connect'; }
-  if (gitlab) { gitlab.classList.toggle('online', !!state.connected.gitlab); gitlabCopy.textContent = state.connected.gitlab ? 'Connected · public projects' : 'Projects · ready to connect'; }
-  document.querySelectorAll('[data-connect="github"]').forEach(button => { button.textContent = state.connected.github ? 'Connected' : 'Connect'; button.classList.toggle('connected', state.connected.github); });
-  document.querySelectorAll('[data-connect="gitlab"]').forEach(button => { button.textContent = state.connected.gitlab ? 'Connected' : 'Connect'; button.classList.toggle('connected', state.connected.gitlab); });
+  const count = document.getElementById('collected-count');
+  const articles = document.getElementById('article-count');
+  if (count) count.textContent = state.resources.filter(resource => resource.source && resource.source !== 'community').length || state.resources.length;
+  if (articles) articles.textContent = state.articleCount || 0;
+  renderSourceHealth();
+  renderIntegrations();
 }
 function renderQuickResults(query = '') {
   const results = state.resources.filter(resource => resourceMatches(resource, query)).slice(0, 7);
@@ -177,6 +229,96 @@ function toggleSaved(id) {
   if (state.saved.includes(id)) { state.saved = state.saved.filter(savedId => savedId !== id); showToast('Removed from your library'); }
   else { state.saved.push(id); showToast('Saved to your library'); }
   saveStorage('aio-saved', state.saved); renderResources();
+}
+function persistSourceState() {
+  saveStorage('aio-source-state', state.sourceState);
+  saveStorage('aio-last-sync', state.lastSync);
+}
+function setSourceStatus(id, patch) {
+  state.sourceState[id] = { ...(state.sourceState[id] || {}), ...patch };
+  persistSourceState();
+  updateCounts();
+}
+function sourceResource({ sourceId, id, name, type, description, tags = [], url, icon, tone, popularity = 0 }) {
+  const category = inferCategory([name, type, description, ...tags]);
+  const score = Math.round(Math.min(100, 34 + Math.log10(Math.max(1, popularity)) * 12 + tags.length * 3));
+  return { id: `${sourceId}-${id}`, name, type: type || `${sourceInfo(sourceId).name} pick`, category, icon: icon || name.slice(0, 1), tone: tone || ['blue', 'violet', 'green', 'orange', 'pink', 'teal'][state.resources.length % 6], description: description || 'A promising project surfaced by the AIO automatic index.', tags: tags.filter(Boolean).slice(0, 4), url, addedAt: new Date().toISOString(), featured: score >= 58, source: sourceId, score };
+}
+async function getJSON(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), options.timeout || 14000);
+  try {
+    const response = await fetch(url, { headers: { Accept: 'application/json', ...(options.headers || {}) }, signal: controller.signal });
+    if (!response.ok) throw new Error(`Source returned ${response.status}`);
+    return await response.json();
+  } finally { clearTimeout(timer); }
+}
+async function collectFromSource(sourceId) {
+  if (sourceId === 'github') {
+    const data = await getJSON(`https://api.github.com/search/repositories?q=${encodeURIComponent('stars:>500 archived:false')}&sort=stars&order=desc&per_page=12`);
+    return (data.items || []).map(item => sourceResource({ sourceId, id: item.id, name: item.full_name, type: 'GitHub repository', description: item.description, tags: [...(item.topics || []), item.language], url: item.html_url, icon: '●', tone: 'blue', popularity: item.stargazers_count }));
+  }
+  if (sourceId === 'gitlab') {
+    const data = await getJSON('https://gitlab.com/api/v4/projects?order_by=star_count&sort=desc&per_page=12&simple=true');
+    return (data || []).map(item => sourceResource({ sourceId, id: item.id, name: item.path_with_namespace, type: 'GitLab project', description: item.description, tags: [item.topics, item.namespace?.name].flat().filter(Boolean), url: item.web_url, icon: '◆', tone: 'orange', popularity: item.star_count }));
+  }
+  if (sourceId === 'npm') {
+    const data = await getJSON('https://registry.npmjs.org/-/v1/search?text=keywords:cli&size=12&popularity=1.0');
+    return (data.objects || []).map(item => { const pkg = item.package || {}; return sourceResource({ sourceId, id: pkg.name, name: pkg.name, type: 'npm package', description: pkg.description, tags: [...(pkg.keywords || []), 'JavaScript'], url: pkg.links?.npm || `https://www.npmjs.com/package/${pkg.name}`, icon: 'npm', tone: 'pink', popularity: Math.round((item.score?.detail?.popularity || 0) * 100000) }); });
+  }
+  if (sourceId === 'pypi') {
+    const packageNames = ['uv', 'ruff', 'polars', 'streamlit', 'gradio', 'fastapi', 'pydantic', 'django'];
+    const results = await Promise.allSettled(packageNames.map(name => getJSON(`https://pypi.org/pypi/${name}/json`)));
+    return results.filter(result => result.status === 'fulfilled').map(result => { const info = result.value.info; return sourceResource({ sourceId, id: info.name, name: info.name, type: 'PyPI package', description: info.summary, tags: [...(info.keywords || '').split(/[, ]+/), 'Python'], url: info.project_url || `https://pypi.org/project/${info.name}/`, icon: 'Py', tone: 'green', popularity: 1000 }); });
+  }
+  if (sourceId === 'docker') {
+    const data = await getJSON('https://hub.docker.com/v2/search/repositories/?page_size=12&ordering=-pull_count&query=developer');
+    return (data.results || []).map(item => sourceResource({ sourceId, id: item.repo_name, name: item.repo_name, type: 'Docker image', description: item.short_description, tags: ['container', 'self-hosted'], url: `https://hub.docker.com/r/${item.repo_name}`, icon: '◇', tone: 'teal', popularity: item.pull_count }));
+  }
+  if (sourceId === 'hackernews') {
+    const data = await getJSON('https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&hitsPerPage=12');
+    return (data.hits || []).filter(item => item.url || item.story_url).map(item => sourceResource({ sourceId, id: item.objectID, name: item.title, type: 'Show HN launch', description: `A new project shared by ${item.author || 'the community'} on Hacker News.`, tags: ['new', 'community launch'], url: item.url || item.story_url, icon: 'Y', tone: 'orange', popularity: item.points || 1 }));
+  }
+  throw new Error('This source needs a public feed or API key');
+}
+function mergeCollected(resources) {
+  const existing = new Set(state.resources.map(resource => resource.url));
+  const fresh = resources.filter(resource => resource.url && !existing.has(resource.url));
+  state.resources.push(...fresh);
+  if (fresh.length) persistImportedResources();
+  return fresh;
+}
+async function syncSource(sourceId) {
+  const source = sourceInfo(sourceId);
+  if (!source || source.api === 'manual') throw new Error(`${source.name} needs an API key or public feed`);
+  if (source.api === 'feed') return addFeed();
+  setSourceStatus(sourceId, { status: 'syncing', connected: true });
+  try {
+    const resources = await collectFromSource(sourceId);
+    const fresh = mergeCollected(resources);
+    const now = new Date().toISOString();
+    state.connected[sourceId] = true;
+    state.lastSync = now;
+    setSourceStatus(sourceId, { status: 'ready', connected: true, lastSync: now, count: resources.length });
+    saveStorage('aio-connected', state.connected);
+    renderResources();
+    return fresh.length;
+  } catch (error) {
+    setSourceStatus(sourceId, { status: 'error', connected: state.sourceState[sourceId]?.connected || false });
+    throw new Error(`${source.name}: ${error.name === 'AbortError' ? 'request timed out' : error.message}`);
+  }
+}
+async function syncAllSources() {
+  const button = document.getElementById('sync-all');
+  if (button) { button.disabled = true; button.classList.add('is-loading'); button.innerHTML = `${iconMarkup('icon-refresh')} Syncing all sources…`; }
+  const syncable = sourceCatalog.filter(source => !['manual', 'feed'].includes(source.api));
+  const results = await Promise.allSettled(syncable.map(source => syncSource(source.id)));
+  const collected = results.filter(result => result.status === 'fulfilled').reduce((sum, result) => sum + result.value, 0);
+  const failed = results.filter(result => result.status === 'rejected').length;
+  if (button) { button.disabled = false; button.classList.remove('is-loading'); button.innerHTML = `${iconMarkup('icon-refresh')} Sync all sources`; }
+  const last = document.getElementById('automation-last');
+  if (last) last.textContent = `Last run · ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · next on the 1st`;
+  showToast(failed ? `${collected} new apps collected · ${failed} sources unavailable` : `${collected} new apps collected from ${syncable.length} sources`, failed ? 'error' : 'success');
 }
 function parseProjectUrl(value) {
   let normalized = value.trim();
@@ -262,9 +404,49 @@ async function addFeed() {
     const existingUrls = new Set(state.resources.map(resource => resource.url)); const fresh = imported.filter(resource => !existingUrls.has(resource.url)); state.resources.push(...fresh); state.connected.feed = true; saveStorage('aio-connected', state.connected); persistImportedResources(); renderResources(); updateCounts(); showToast(`${fresh.length} resources synced from feed`);
   } catch (error) { showToast(error.message || 'Could not sync that feed', 'error'); }
 }
+function monthlyArticleData() {
+  const now = new Date();
+  const month = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const external = state.resources.filter(resource => resource.source && resource.source !== 'community');
+  const pool = (external.length ? external : state.resources).slice().sort((a, b) => (b.score || 0) - (a.score || 0) || new Date(b.addedAt || 0) - new Date(a.addedAt || 0));
+  const picks = pool.slice(0, 8);
+  const categorySections = Object.keys(categoryNames).map(category => ({ category, items: pool.filter(item => item.category === category).slice(0, 2) })).filter(section => section.items.length);
+  const title = `The AIO monthly: ${month}'s best new tools`;
+  const intro = external.length ? `This month, AIO scanned ${new Set(external.map(item => item.source)).size} open-web sources and ranked ${external.length} new projects by community interest, freshness, and usefulness. Here are the tools worth a closer look.` : 'This month\'s index is starting with a small set of community picks. Connect a source and AIO will automatically turn the next sync into a richer monthly brief.';
+  const markdown = [`# ${title}`, '', `*Generated ${now.toISOString().slice(0, 10)} by AIO Hub*`, '', intro, '', '## The shortlist', '', ...picks.map((item, index) => `${index + 1}. **${item.name}** — ${item.description} [Open project](${item.url})`), '', '## Browse by category', '', ...categorySections.flatMap(section => [`### ${formatCategory(section.category)}`, ...section.items.map(item => `- **${item.name}** · ${item.description} [${sourceInfo(item.source).name}](${item.url})`), '']), '## How this list is made', '', 'AIO collects public metadata from connected clients, scores projects using activity and popularity signals, automatically assigns a category, removes duplicate links, and keeps the final draft human-readable. Review this draft before publishing.', ''].join('\\n');
+  return { title, month, intro, picks, categorySections, markdown, total: external.length };
+}
+function renderArticle(data) {
+  const preview = document.getElementById('article-preview');
+  if (!preview) return;
+  preview.innerHTML = `<h1>${escapeHTML(data.title)}</h1><div class="article-byline">Generated ${escapeHTML(new Date().toLocaleDateString('en-US', { dateStyle: 'long' }))} · ${data.total} indexed source picks</div><p>${escapeHTML(data.intro)}</p><h2>The shortlist</h2>${data.picks.map((item, index) => `<div class="article-pick"><span class="article-pick-number">0${index + 1}</span><div><b>${escapeHTML(item.name)}</b><small>${escapeHTML(item.description)} · ${escapeHTML(sourceInfo(item.source).name)} · <a href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer">Open project ↗</a></small></div></div>`).join('')}<h2>Browse by category</h2>${data.categorySections.map(section => `<p><b>${escapeHTML(formatCategory(section.category))}</b></p><ul>${section.items.map(item => `<li><b>${escapeHTML(item.name)}</b> — ${escapeHTML(item.description)}</li>`).join('')}</ul>`).join('')}<h2>How this list is made</h2><p>AIO collects public metadata from connected clients, scores projects using activity and popularity signals, automatically assigns a category, removes duplicate links, and keeps the final draft human-readable. Review this draft before publishing.</p>`;
+}
+function generateMonthlyArticle() {
+  const data = monthlyArticleData();
+  state.articleMarkdown = data.markdown;
+  state.articleCount += 1;
+  saveStorage('aio-article-count', state.articleCount);
+  renderArticle(data);
+  document.getElementById('article-meta').textContent = `${data.total} source picks · ready to review and publish`;
+  updateCounts();
+  openModal('article-modal');
+}
+function downloadArticle() {
+  const markdown = state.articleMarkdown || monthlyArticleData().markdown;
+  const slug = new Date().toISOString().slice(0, 7);
+  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+  const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `aio-monthly-update-${slug}.md`; link.click(); URL.revokeObjectURL(link.href);
+}
+async function copyArticle() {
+  try { await navigator.clipboard.writeText(state.articleMarkdown || monthlyArticleData().markdown); showToast('Article markdown copied'); }
+  catch { showToast('Clipboard access is unavailable', 'error'); }
+}
 function connectSource(source) {
+  const info = sourceInfo(source);
+  if (!info) return;
   if (source === 'feed') { addFeed(); return; }
-  state.connected[source] = true; saveStorage('aio-connected', state.connected); updateCounts(); showToast(`${source === 'github' ? 'GitHub' : 'GitLab'} connected — ready to import public projects`);
+  if (source === 'producthunt') { showToast('Product Hunt requires an API key — use a public feed for now', 'error'); return; }
+  syncSource(source).then(count => showToast(count ? `${count} new ${info.name} picks added` : `${info.name} is already up to date`)).catch(error => showToast(error.message, 'error'));
 }
 function openResource(id) {
   const resource = state.resources.find(item => item.id === id); if (resource?.url) window.open(resource.url, '_blank', 'noopener,noreferrer');
@@ -277,6 +459,10 @@ function bindEvents() {
     const tabButton = event.target.closest('[data-tab]'); if (tabButton) { state.tab = tabButton.dataset.tab; state.category = null; document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.toggle('active', tab === tabButton)); renderResources(); return; }
     const viewButton = event.target.closest('[data-view]'); if (viewButton) { state.view = viewButton.dataset.view; document.querySelectorAll('.view-button').forEach(button => button.classList.toggle('active', button === viewButton)); renderResources(); return; }
     const searchSuggestion = event.target.closest('[data-search]'); if (searchSuggestion) { state.query = searchSuggestion.dataset.search; document.getElementById('global-search').value = state.query; state.category = null; renderResources(); document.getElementById('explore').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    if (event.target.closest('#sync-all')) { syncAllSources(); return; }
+    if (event.target.closest('#generate-article')) { generateMonthlyArticle(); return; }
+    if (event.target.closest('#download-article')) { downloadArticle(); return; }
+    if (event.target.closest('#copy-article')) { copyArticle(); return; }
     if (event.target.closest('#sync-button, #sidebar-sync, #manage-sources, #empty-sync')) { openSyncModal(); return; }
     const connectButton = event.target.closest('[data-connect]'); if (connectButton) { connectSource(connectButton.dataset.connect); return; }
     const quickResource = event.target.closest('[data-open-resource]'); if (quickResource) { openResource(quickResource.dataset.openResource); closeModals(); return; }
